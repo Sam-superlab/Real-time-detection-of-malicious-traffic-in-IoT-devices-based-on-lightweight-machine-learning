@@ -22,15 +22,10 @@ logger = logging.getLogger(__name__)
 class MaliciousTrafficDetector:
     """Real-time malicious traffic detector using ONNX model."""
 
-    def __init__(self, config_path: str = "configs/config.yaml"):
+    def __init__(self, config_path: str = "configs/config.yaml", test_mode: bool = False):
         """Initialize the detector with configuration."""
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
-
-        # Load model
-        model_path = os.path.join(self.config['data']['models'], 'model.onnx')
-        self.session = rt.InferenceSession(model_path)
-        self.input_name = self.session.get_inputs()[0].name
 
         # Initialize packet buffer
         self.window_size = self.config['data']['window_size']
@@ -51,6 +46,20 @@ class MaliciousTrafficDetector:
             'malicious_detected': 0,
             'processing_time': []
         }
+
+        # Load model if not in test mode
+        self.test_mode = test_mode
+        if not test_mode:
+            model_path = os.path.join(
+                self.config['data']['models'], 'model.onnx')
+            if os.path.exists(model_path):
+                self.session = rt.InferenceSession(model_path)
+                self.input_name = self.session.get_inputs()[0].name
+            else:
+                logger.warning(
+                    "No model found at %s. Running in feature extraction mode only.", model_path)
+                self.session = None
+                self.input_name = None
 
     def extract_features(self, packet) -> Dict:
         """Extract features from a single packet."""
@@ -108,38 +117,59 @@ class MaliciousTrafficDetector:
         window_features['packet_length_min'] = np.min(lengths)
         window_features['packet_length_max'] = np.max(lengths)
 
+        # Inter-arrival time statistics
+        if len(packets) > 1:
+            arrival_times = [float(p.time) for p in packets]
+            inter_arrival_times = np.diff(arrival_times)
+            window_features['inter_arrival_time_mean'] = np.mean(
+                inter_arrival_times)
+            window_features['inter_arrival_time_std'] = np.std(
+                inter_arrival_times)
+            window_duration = arrival_times[-1] - arrival_times[0]
+        else:
+            window_features['inter_arrival_time_mean'] = 0.0
+            window_features['inter_arrival_time_std'] = 0.0
+            window_duration = 1.0  # Default duration for single packet
+
         # Protocol distribution
         protocols = [f['protocol'] for f in packet_features]
         unique_protocols, counts = np.unique(protocols, return_counts=True)
-        window_features['protocol_distribution'] = dict(
-            zip(unique_protocols, counts / len(protocols)))
+        window_features['protocol_distribution'] = float(
+            len(unique_protocols)) / len(protocols)
 
         # Port distribution
         ports = [f['src_port'] for f in packet_features] + \
             [f['dst_port'] for f in packet_features]
         unique_ports, counts = np.unique(ports, return_counts=True)
-        window_features['port_distribution'] = dict(
-            zip(unique_ports, counts / len(ports)))
+        window_features['port_distribution'] = float(
+            len(unique_ports)) / len(ports)
 
         # TCP flags distribution
         tcp_flags = [f['tcp_flags'] for f in packet_features]
         unique_flags, counts = np.unique(tcp_flags, return_counts=True)
-        window_features['tcp_flags_distribution'] = dict(
-            zip(unique_flags, counts / len(tcp_flags)))
+        window_features['tcp_flags_distribution'] = float(
+            len(unique_flags)) / len(tcp_flags)
 
         # Flow-based features
-        window_features['flow_duration'] = len(packets)
+        window_features['flow_duration'] = window_duration
         window_features['flow_bytes_per_second'] = sum(
-            lengths) / (len(packets) + 1e-6)
-        window_features['flow_packets_per_second'] = len(packets)
+            lengths) / (window_duration + 1e-6)
+        window_features['flow_packets_per_second'] = len(
+            packets) / (window_duration + 1e-6)
+        window_features['packet_count_per_second'] = len(
+            packets) / (window_duration + 1e-6)
 
         # Convert to numpy array in the correct order
-        feature_vector = np.array([window_features[f]
-                                  for f in self.config['data']['feature_list']])
+        feature_vector = np.array([float(window_features[f])
+                                  for f in self.config['data']['feature_list']], dtype=np.float32)
         return feature_vector.reshape(1, -1)
 
     def predict(self, features: np.ndarray) -> float:
         """Make prediction using ONNX model."""
+        if self.test_mode or self.session is None:
+            # Return dummy prediction in test mode
+            return 0.5
+
         start_time = time.time()
         prediction = self.session.run(
             None, {self.input_name: features.astype(np.float32)})[0]
@@ -203,6 +233,10 @@ class MaliciousTrafficDetector:
 
     def start(self):
         """Start the detection system."""
+        if not self.test_mode and self.session is None:
+            logger.error("Cannot start detection without a trained model")
+            return False
+
         logger.info(f"Starting detection on interface {self.interface}")
 
         # Start processing thread

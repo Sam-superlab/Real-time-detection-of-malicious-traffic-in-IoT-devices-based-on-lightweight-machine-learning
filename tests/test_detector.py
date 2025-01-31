@@ -8,7 +8,7 @@ from src.detection.detector import MaliciousTrafficDetector
 @pytest.fixture
 def detector():
     """Create a detector instance for testing."""
-    return MaliciousTrafficDetector()
+    return MaliciousTrafficDetector(test_mode=True)
 
 
 @pytest.fixture

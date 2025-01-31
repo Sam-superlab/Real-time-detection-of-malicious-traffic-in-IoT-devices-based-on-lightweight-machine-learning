@@ -1,0 +1,6 @@
+# macOS system files
+.DS_Store
+**/.DS_Store
+
+# In case there are .DS_Store files in subdirectories with spaces
+"**/.DS_Store" 
