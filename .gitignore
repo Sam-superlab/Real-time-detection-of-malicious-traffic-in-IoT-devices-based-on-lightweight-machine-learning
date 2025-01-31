@@ -3,4 +3,28 @@
 **/.DS_Store
 
 # In case there are .DS_Store files in subdirectories with spaces
-"**/.DS_Store" 
+"**/.DS_Store"
+
+# LaTeX files
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+
+# Research proposal specific
+Research-proposal/*
+!Research-proposal/*.tex
+!Research-proposal/*.bib
+!Research-proposal/figures/
+Research-proposal/figures/*.pdf
+Research-proposal/_minted*/ 

@@ -1,0 +1,265 @@
+\documentclass[12pt]{article}
+
+\usepackage[left=1in,right=1in,top=1in,bottom=1in]{geometry}
+\usepackage{setspace}        % For line spacing
+\usepackage{graphicx}        % For including graphics
+\usepackage{booktabs}        % For professional table lines
+\usepackage{array}           % For advanced table options
+\usepackage{amsmath,amssymb} % For math symbols
+\usepackage{hyperref}        % For hyperlinks
+\usepackage{enumerate}       % For custom lists
+\usepackage{caption}         % Better control over figure/table captions
+\usepackage{float}           % Improved float handling
+\usepackage{listings}        % For code listings
+\usepackage{color}           % If you need colored text
+\usepackage{multirow}        % For multirow cells in tables
+\usepackage{forest}
+\usepackage{tikz}
+\usepackage[backend=bibtex, style=ieee, sorting=none]{biblatex} 
+\addbibresource{references.bib} % Link the .bib file
+
+
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+% Optional: Some basic stylings
+\setstretch{1.15}            % Set line spacing
+\setlength{\parskip}{6pt}    % Spacing between paragraphs
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TITLE & AUTHOR INFO
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
+    {\Large \textbf{RESEARCH PROPOSAL:\\[6pt]
+    \textit{Low-Compute Malicious IoT Traffic Detection Using \\ LightGBM and Advanced Feature Selection}}}\\
+    \vfill
+    \textbf{Author:} Xuyi Ren \\
+    \textbf{Affiliation:} Grinnell College \\
+    \textbf{Email:} \texttt{renxuyi@grinnell.edu} \\
+    \vfill
+    \textbf{Date:} \today
+    \vspace*{2cm}
+\end{titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ABSTRACT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{abstract}
+This proposal presents a plan to develop and deploy a low-compute IoT malicious traffic detection framework. 
+We aim to create a lightweight, real-time intrusion detection solution that consumes minimal CPU and memory resources while maintaining high detection accuracy. 
+Our approach leverages a compressed LightGBM model (under 5MB) paired with an advanced feature selection pipeline (e.g., CorrAUC) to filter high-dimensional network traffic data effectively. 
+In experimental trials with public IoT security datasets (e.g., Bot-IoT, CIC-IDS2017), we expect to achieve over 95\% detection accuracy with sub-5ms inference latency on typical CPU hardware. 
+\end{abstract}
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 1. INTRODUCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+
+With the rapid growth of Internet-of-Things (IoT) devices, security threats such as botnets, DDoS, and data exfiltration attacks have become prevalent \cite{salman2022iot}. 
+Traditional rule-based intrusion detection systems (IDS) struggle to maintain high accuracy for diverse IoT traffic, while large neural-network-based approaches often exceed the resource constraints of embedded devices.
+
+In this proposal, we outline a lightweight malicious traffic detection framework that integrates:
+\begin{itemize}
+    \item A \textbf{compact LightGBM} classifier leveraging gradient-based one-side sampling (GOSS).
+    \item \textbf{Advanced feature selection} metrics (e.g., CorrAUC) to retain the most discriminative features.
+    \item \textbf{ONNX Runtime} for real-time inference.
+\end{itemize}
+
+Our objective is to reliably detect IoT-based attacks in near real-time on CPU-only platforms (e.g., Raspberry Pi, Intel NUC) while ensuring minimal memory footprints. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. BACKGROUND & MOTIVATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Background and Motivation}
+
+\subsection{IoT Security Challenges}
+IoT devices range from sensors and smart-home appliances to industrial IoT platforms. 
+Many of these devices lack robust built-in security, making them vulnerable to exploits.
+Recent studies show an increase in botnet-based attacks, such as Mirai and Bashlite, that target IoT systems.
+
+\subsection{Machine Learning for Intrusion Detection}
+Machine learning (ML) based network intrusion detection has shown promise in identifying novel attacks. 
+However, deep learning methods often require significant computational resources, making them difficult to deploy on low-power devices. 
+Tree-based ensemble methods (LightGBM, XGBoost) strike a balance between \emph{accuracy} and \emph{efficiency}, but require well-engineered features to avoid misclassification of malicious traffic.
+
+\subsection{Feature Selection and CorrAUC}
+Feature selection is crucial to reduce dimensionality and improve detection performance \cite{shafiq2021corrAUC}. 
+Recently, a \emph{CorrAUC} metric (combining correlation analysis and area-under-curve feedback) has been proposed to systematically remove redundant or uninformative features. 
+By integrating CorrAUC into our pipeline, we aim to achieve a highly compact, high-performing feature subset for IoT traffic classification.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 3. RESEARCH OBJECTIVES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Research Objectives}
+
+\begin{enumerate}[(1)]
+    \item \textbf{Develop a Low-Compute Detection Pipeline:} 
+    Implement a real-time IoT malicious traffic detection framework utilizing LightGBM with a final model size under 5MB.
+    
+    \item \textbf{Optimize Feature Selection:} 
+    Compare and integrate advanced feature selection methods (CorrAUC vs.\ baseline filters like mutual information) to maximize detection accuracy and minimize computation.
+    
+    \item \textbf{Validate Performance on Public Datasets:}
+    Evaluate the approach on Bot-IoT and CIC-IDS2017 datasets, aiming for over 95\% accuracy, under 2\% false alarm rate, and sub-5ms inference latency.
+    
+    \item \textbf{Demonstrate Practical Deployment:}
+    Deploy the final pipeline on resource-constrained hardware (e.g., Raspberry Pi or Intel NUC) and report memory, CPU usage, throughput, and detection performance.
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 4. METHODOLOGY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Methodology}
+
+The proposed system architecture follows a modular design pattern to ensure maintainability and scalability. The core components are organized as follows:
+
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+project_root/
+|-- src/
+|   |-- models/
+|   |   |-- train.py          # Model training and optimization
+|   |   `-- predict.py        # Real-time prediction module
+|   |-- data/
+|   |   |-- preprocessing/    # Feature extraction pipeline
+|   |   |-- download_dataset.py
+|   |   `-- preprocess.py
+|   |-- detection/
+|   |   |-- detector.py       # Core detection logic
+|   |   `-- api.py           # REST API endpoints
+|   `-- utils/
+|       |-- logger.py         # Logging utilities
+|       `-- metrics.py        # Performance metrics
+|-- configs/
+|   `-- config.yaml          # System configuration
+|-- data/
+|   |-- raw/                 # Raw PCAP files
+|   |-- processed/           # Processed features
+|   `-- models/              # Trained models
+|-- notebooks/
+|   |-- analysis.ipynb       # Data analysis
+|   `-- visualization.ipynb  # Results visualization
+|-- tests/
+|   |-- test_detector.py     # Detection tests
+|   `-- test_preprocessing.py
+`-- docs/
+    |-- README.md            # Project documentation
+    `-- CONTRIBUTING.md      # Contribution guidelines
+\end{lstlisting}
+
+Our implementation approach begins with data acquisition from established IoT security datasets, specifically Bot-IoT and CIC-IDS2017, supplemented by real IoT traffic traces for comprehensive testing. The preprocessing pipeline segments network packets into windows and extracts a rich set of statistical, protocol-based, and temporal features.
+
+\textbf{Feature Selection and Model Development:} At the core of our approach lies the CorrAUC-based feature selection process. This method first evaluates the correlation between individual features and malicious/benign labels, measuring the AUC of single-feature classifiers. Through iterative refinement, we build an optimal feature subset that maximizes detection accuracy while minimizing computational overhead. The selection process terminates when additional features no longer yield significant improvements in validation AUC scores.
+
+\textbf{Model Training and Optimization:} The LightGBM classifier employs gradient-based one-side sampling (GOSS) for efficient training. Key hyperparameters including learning rate and number of leaves are fine-tuned through cross-validation. To achieve our target model size of under 5MB, we employ model compression techniques such as 8-bit quantization or knowledge distillation, carefully balancing the trade-off between model size and detection accuracy.
+
+\textbf{Performance Evaluation:} System performance is assessed across multiple dimensions: detection accuracy (targeting >95\%), precision-recall metrics, false positive rates (<2\%), and operational efficiency metrics including throughput (packets/sec) and latency (targeting <5ms per inference). Memory footprint and CPU utilization are continuously monitored to ensure compatibility with resource-constrained IoT environments.
+
+\textbf{Deployment Strategy:} The final implementation converts the trained model to ONNX format for efficient CPU inference. The detection system integrates with live network interfaces through a Python/C++ runtime, providing both real-time detection capabilities and a REST API for system monitoring and control. This architecture ensures minimal resource consumption while maintaining robust detection performance on edge devices like Raspberry Pi or Intel NUC platforms.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 5. IMPLEMENTATION PLAN & TIMELINE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Implementation Plan and Timeline}
+
+\subsection{Work Breakdown}
+\begin{enumerate}
+    \item \textbf{Phase 1: Literature Review (Weeks 1--2)}
+    \begin{itemize}
+        \item Review IoT threat landscape, existing IDS solutions, and feature selection methods.
+        \item Finalize target performance metrics (accuracy $>$95\%, \ldots).
+    \end{itemize}
+    
+    \item \textbf{Phase 2: Dataset Preparation (Weeks 3--5)}
+    \begin{itemize}
+        \item Acquire Bot-IoT, CIC-IDS2017.
+        \item Clean, label, and partition data into training/validation/testing sets.
+        \item Perform data augmentation or balancing (e.g., SMOTE-Tomek).
+    \end{itemize}
+    
+    \item \textbf{Phase 3: Model Development (Weeks 6--8)}
+    \begin{itemize}
+        \item Implement feature extraction pipeline (Python scripts).
+        \item Apply CorrAUC-based feature selection.
+        \item Train baseline LightGBM model with default feature sets (for comparison).
+    \end{itemize}
+    
+    \item \textbf{Phase 4: Optimization \& Model Compression (Weeks 9--11)}
+    \begin{itemize}
+        \item Tune hyperparameters (learning rate, \emph{num\_leaves}, etc.).
+        \item Evaluate knowledge distillation or model quantization (8-bit).
+        \item Convert final model to ONNX format; measure model size and inference speed.
+    \end{itemize}
+    
+    \item \textbf{Phase 5: Deployment \& Testing (Weeks 12--14)}
+    \begin{itemize}
+        \item Deploy on Raspberry Pi or Intel NUC.
+        \item Integrate with a real-time packet capture engine (e.g., \texttt{dpkt}, \texttt{scapy}).
+        \item Measure CPU usage, memory footprint, detection latency, and accuracy in real-time.
+    \end{itemize}
+
+    \item \textbf{Phase 6: Evaluation \& Final Report (Weeks 15--16)}
+    \begin{itemize}
+        \item Compare results against baseline approaches.
+        \item Document system design, performance, and potential improvements.
+        \item Prepare final thesis/report and possible conference/journal submission.
+    \end{itemize}
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 6. EXPECTED OUTCOMES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Expected Outcomes}
+
+\begin{itemize}
+    \item A fully functional \textbf{prototype intrusion detection system} capable of identifying malicious IoT traffic in real time on CPU-only devices.
+    \item \textbf{Lightweight model} ($<$5MB) with detection accuracy $>$95\%, FPR $<$2\%, and inference latency $<$5\,ms.
+    \item Empirical evidence supporting \textbf{CorrAUC feature selection} for IoT anomaly detection.
+    \item A \textbf{deployment guideline} or best practices for low-power IoT gateways.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 7. RISK ANALYSIS & MITIGATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Risk Analysis and Mitigation}
+
+\subsection{Insufficient or Unbalanced Data}
+\textbf{Risk}: Bot-IoT or CIC-IDS2017 may not represent all possible IoT attack vectors.\\
+\textbf{Mitigation}: Collect real IoT traffic or integrate additional public datasets (NSL-KDD, etc.). 
+Use class balancing techniques if needed.
+
+\subsection{Overfitting or Model Complexity}
+\textbf{Risk}: Excessive feature engineering or large model size could reduce generalizability.\\
+\textbf{Mitigation}: Adopt early stopping, cross-validation, knowledge distillation for smaller final models.
+
+\subsection{Deployment Performance Bottlenecks}
+\textbf{Risk}: Real-time detection might exceed CPU capacity under high traffic volume.\\
+\textbf{Mitigation}: Implement micro-batching, efficient C++ or ONNX runtime, or partial feature extraction.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 8. REFERENCES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\printbibliography
+
+\end{document}
