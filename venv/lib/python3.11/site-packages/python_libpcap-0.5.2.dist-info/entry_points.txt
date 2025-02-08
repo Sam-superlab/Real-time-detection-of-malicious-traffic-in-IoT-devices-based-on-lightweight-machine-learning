@@ -1,0 +1,5 @@
+[console_scripts]
+libpcap-capture = pylibpcap.cli:pylibpcap_sniff
+libpcap-merge = pylibpcap.cli:pylibpcap_merge
+libpcap-read = pylibpcap.cli:pylibpcap_read
+libpcap-write = pylibpcap.cli:pylibpcap_write

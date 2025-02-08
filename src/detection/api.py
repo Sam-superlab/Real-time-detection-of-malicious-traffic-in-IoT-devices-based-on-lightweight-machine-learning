@@ -6,7 +6,8 @@ import yaml
 import logging
 import threading
 from datetime import datetime
-from .detector import MaliciousTrafficDetector
+import os
+from detector import MaliciousTrafficDetector
 
 # Setup logging
 logging.basicConfig(
@@ -16,8 +17,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Load configuration
-with open("configs/config.yaml", 'r') as f:
-    config = yaml.safe_load(f)
+try:
+    config_path = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.dirname(__file__))), 'configs', 'config.yaml')
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+except Exception as e:
+    logger.error(f"Error loading config: {str(e)}")
+    config = {
+        'api': {
+            'host': '0.0.0.0',
+            'port': 8000,
+            'workers': 4
+        }
+    }
 
 # Initialize FastAPI app
 app = FastAPI(

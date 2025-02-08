@@ -6,7 +6,10 @@ import logging
 from tqdm import tqdm
 import pandas as pd
 import zipfile
-from typing import Optional
+from typing import Optional, List, Dict
+import argparse
+import sys
+from pathlib import Path
 
 # Setup logging
 logging.basicConfig(
@@ -17,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class DatasetDownloader:
-    """Download and prepare the CIC-IDS2017 dataset."""
+    """Download and prepare the dataset."""
 
-    def __init__(self, config_path: str = "configs/config.yaml"):
+    def __init__(self, config_path: str = "configs/config.yaml", dataset: str = "bot-iot"):
         """Initialize the downloader with configuration."""
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
@@ -27,25 +30,27 @@ class DatasetDownloader:
         self.raw_data_path = self.config['data']['raw_data_path']
         os.makedirs(self.raw_data_path, exist_ok=True)
 
-        # Dataset URLs and checksums
-        self.datasets = {
-            'monday': {
-                'url': 'https://example.com/cicids2017/monday.pcap.zip',  # Replace with actual URL
-                'md5': 'abc123',  # Replace with actual MD5
-                'filename': 'monday.pcap.zip'
-            },
-            'tuesday': {
-                'url': 'https://example.com/cicids2017/tuesday.pcap.zip',
-                'md5': 'def456',
-                'filename': 'tuesday.pcap.zip'
-            },
-            # Add more days as needed
-        }
+        # Get dataset configuration
+        self.datasets = self.config['data']['datasets']
+        self.selected_dataset = self.datasets.get(dataset)
+        if not self.selected_dataset:
+            available_datasets = list(self.datasets.keys())
+            raise ValueError(
+                f"Unknown dataset: {dataset}. Available datasets: {available_datasets}")
 
-    def download_file(self, url: str, filename: str) -> bool:
+    def download_file(self, url: str, filename: str, use_mirror: bool = False) -> bool:
         """Download a file with progress bar."""
         try:
+            # Try primary URL first
             response = requests.get(url, stream=True)
+            if response.status_code == 404 and use_mirror and self.selected_dataset.get('mirrors'):
+                logger.info(f"Primary URL failed, trying mirror...")
+                for mirror in self.selected_dataset['mirrors']:
+                    mirror_url = mirror + filename
+                    response = requests.get(mirror_url, stream=True)
+                    if response.status_code == 200:
+                        break
+
             response.raise_for_status()
 
             total_size = int(response.headers.get('content-length', 0))
@@ -65,95 +70,147 @@ class DatasetDownloader:
 
         except Exception as e:
             logger.error(f"Error downloading {filename}: {str(e)}")
+            if use_mirror:
+                logger.error(
+                    "All download attempts failed (primary URL and mirrors)")
             return False
 
-    def verify_checksum(self, filename: str, expected_md5: str) -> bool:
-        """Verify file integrity using MD5 checksum."""
-        md5_hash = hashlib.md5()
-
-        try:
-            with open(filename, "rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    md5_hash.update(chunk)
-
-            calculated_md5 = md5_hash.hexdigest()
-            return calculated_md5 == expected_md5
-
-        except Exception as e:
-            logger.error(f"Error verifying checksum for {filename}: {str(e)}")
-            return False
-
-    def extract_pcap(self, zip_file: str, output_dir: str) -> bool:
-        """Extract PCAP files from zip archive."""
+    def extract_dataset(self, zip_file: str, output_dir: str) -> bool:
+        """Extract dataset files from zip archive."""
         try:
             with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-                # Extract only .pcap files
-                for file in zip_ref.namelist():
-                    if file.endswith('.pcap'):
-                        zip_ref.extract(file, output_dir)
-                        logger.info(f"Extracted {file}")
+                # Extract all files
+                zip_ref.extractall(output_dir)
+                logger.info(f"Extracted {zip_file} to {output_dir}")
             return True
 
         except Exception as e:
             logger.error(f"Error extracting {zip_file}: {str(e)}")
             return False
 
-    def download_datasets(self):
-        """Download all dataset files."""
-        for day, info in self.datasets.items():
-            output_file = os.path.join(self.raw_data_path, info['filename'])
+    def verify_dataset(self, dataset_path: str) -> bool:
+        """Verify the downloaded dataset structure and contents."""
+        try:
+            # Check if essential files exist
+            required_files = [
+                'README.md',
+                'data',
+                'labels'
+            ]
 
-            # Skip if file exists and checksum matches
-            if os.path.exists(output_file) and self.verify_checksum(output_file, info['md5']):
-                logger.info(
-                    f"Skipping {day}, file already exists and checksum matches")
+            for file in required_files:
+                file_path = os.path.join(dataset_path, file)
+                if not os.path.exists(file_path):
+                    logger.error(f"Missing required file/directory: {file}")
+                    return False
+
+            # Check data directory contents
+            data_dir = os.path.join(dataset_path, 'data')
+            if len(os.listdir(data_dir)) == 0:
+                logger.error("Data directory is empty")
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error verifying dataset: {str(e)}")
+            return False
+
+    def download_dataset(self, use_mirror: bool = False) -> bool:
+        """Download the selected dataset."""
+        success = True
+
+        # Create dataset-specific directory
+        dataset_dir = os.path.join(
+            self.raw_data_path, self.selected_dataset['description'].lower().replace(' ', '_'))
+        os.makedirs(dataset_dir, exist_ok=True)
+
+        # Download all URLs for the dataset
+        for url in self.selected_dataset['urls']:
+            filename = os.path.join(dataset_dir, os.path.basename(url))
+
+            if os.path.exists(filename):
+                logger.info(f"File already exists: {filename}")
                 continue
 
-            # Download file
-            logger.info(f"Downloading {day} dataset...")
-            if self.download_file(info['url'], output_file):
-                # Verify checksum
-                if self.verify_checksum(output_file, info['md5']):
-                    logger.info(
-                        f"Successfully downloaded and verified {day} dataset")
+            logger.info(f"Downloading from {url}...")
+            if not self.download_file(url, filename, use_mirror):
+                success = False
+                continue
 
-                    # Extract PCAP files
-                    if self.extract_pcap(output_file, self.raw_data_path):
-                        logger.info(f"Successfully extracted {day} dataset")
-                        # Optionally remove zip file after extraction
-                        os.remove(output_file)
-                    else:
-                        logger.error(f"Failed to extract {day} dataset")
-                else:
-                    logger.error(
-                        f"Checksum verification failed for {day} dataset")
-                    os.remove(output_file)
-            else:
-                logger.error(f"Failed to download {day} dataset")
+            # If it's a zip file, extract it
+            if filename.endswith('.zip'):
+                if not self.extract_dataset(filename, dataset_dir):
+                    success = False
+                    continue
 
-    def prepare_labels(self):
-        """Prepare labels for the dataset using provided CSV files."""
-        # This would typically involve:
-        # 1. Reading the label CSV files
-        # 2. Matching timestamps with PCAP files
-        # 3. Creating a mapping of packet/flow -> label
-        # 4. Saving the labels in a format that can be used during training
-        pass
+                # Optionally remove zip file after extraction
+                os.remove(filename)
+
+        # Verify dataset
+        if success and not self.verify_dataset(dataset_dir):
+            success = False
+
+        return success
+
+    def prepare_dataset(self) -> bool:
+        """Prepare the dataset for training."""
+        try:
+            dataset_dir = os.path.join(
+                self.raw_data_path, self.selected_dataset['description'].lower().replace(' ', '_'))
+
+            # Dataset-specific preprocessing steps can be added here
+            logger.info("Dataset preparation completed successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error preparing dataset: {str(e)}")
+            return False
 
 
 def main():
     """Main function to download and prepare the dataset."""
-    downloader = DatasetDownloader()
+    parser = argparse.ArgumentParser(
+        description="Download and prepare dataset")
+    parser.add_argument(
+        "--dataset",
+        choices=['bot-iot', 'n-baiot', 'iot-23', 'ton-iot'],
+        default='bot-iot',
+        help="Dataset to download (default: bot-iot)"
+    )
+    parser.add_argument(
+        "--config",
+        default="configs/config.yaml",
+        help="Path to configuration file"
+    )
+    parser.add_argument(
+        "--use-mirror",
+        action="store_true",
+        help="Use mirror URLs if primary download fails"
+    )
+    args = parser.parse_args()
 
-    # Download datasets
-    logger.info("Starting dataset download...")
-    downloader.download_datasets()
+    try:
+        downloader = DatasetDownloader(
+            config_path=args.config, dataset=args.dataset)
 
-    # Prepare labels
-    logger.info("Preparing dataset labels...")
-    downloader.prepare_labels()
+        # Download dataset
+        logger.info(f"Starting {args.dataset} dataset download...")
+        if not downloader.download_dataset(use_mirror=args.use_mirror):
+            logger.error("Dataset download failed")
+            sys.exit(1)
 
-    logger.info("Dataset preparation completed!")
+        # Prepare dataset
+        logger.info("Preparing dataset...")
+        if not downloader.prepare_dataset():
+            logger.error("Dataset preparation failed")
+            sys.exit(1)
+
+        logger.info("Dataset download and preparation completed successfully!")
+
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

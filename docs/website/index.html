@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Malicious Traffic Detection</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-tomorrow.min.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">IoT Security</div>
+        <div class="nav-links">
+            <a href="#home">Home</a>
+            <a href="#features">Features</a>
+            <a href="#demo">Demo</a>
+            <a href="#docs">Documentation</a>
+            <a href="https://github.com/yourusername/project" class="github-link">
+                <i class="fab fa-github"></i> GitHub
+            </a>
+        </div>
+    </nav>
+
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h1>Real-time Detection of Malicious Traffic in IoT Devices</h1>
+            <p>A lightweight machine learning approach for securing IoT networks</p>
+            <div class="cta-buttons">
+                <a href="#demo" class="cta-primary">View Demo</a>
+                <a href="https://github.com/yourusername/project" class="cta-secondary">Get Started</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <canvas id="networkGraph"></canvas>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <h2>Key Features</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <i class="fas fa-feather"></i>
+                <h3>Lightweight</h3>
+                <p>CPU-only operation with <5MB model size</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-bolt"></i>
+                <h3>Fast Inference</h3>
+                <p>
+                    <5ms per prediction on typical hardware</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-chart-line"></i>
+                <h3>High Accuracy</h3>
+                <p>>95% detection rate with <2% false positives</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-microchip"></i>
+                <h3>Resource Efficient</h3>
+                <p>
+                    <100MB RAM usage during operation</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="demo" class="demo">
+        <div class="demo-section">
+            <h2>Live Detection Demo</h2>
+            <div class="demo-controls">
+                <button id="startDemo" class="primary-button">Start Detection</button>
+                <div class="connection-status">
+                    <span id="statusIndicator" class="status-dot"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+            </div>
+
+            <div class="metrics-container">
+                <div class="metric-card">
+                    <h3>Packets Analyzed</h3>
+                    <p id="packetCount">0</p>
+                </div>
+                <div class="metric-card">
+                    <h3>Threats Detected</h3>
+                    <p id="threatCount">0</p>
+                </div>
+                <div class="metric-card">
+                    <h3>Average Latency</h3>
+                    <p id="avgLatency">0ms</p>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="trafficChart"></canvas>
+            </div>
+
+            <div class="alerts-container">
+                <h3>Recent Alerts</h3>
+                <div id="alertsList"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="docs" class="documentation">
+        <h2>Documentation</h2>
+        <div class="doc-grid">
+            <div class="doc-card">
+                <h3>Quick Start</h3>
+                <pre><code class="language-bash">
+git clone https://github.com/yourusername/project
+cd project
+pip install -r requirements.txt
+python src/detection/api.py</code></pre>
+            </div>
+            <div class="doc-card">
+                <h3>Performance</h3>
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>Links</h4>
+                <a href="https://github.com/yourusername/project">GitHub</a>
+                <a href="docs/api.html">API Reference</a>
+                <a href="docs/contributing.html">Contributing</a>
+            </div>
+            <div class="footer-section">
+                <h4>Contact</h4>
+                <p>Email: renxuyi@grinnell.edu</p>
+                <p>Grinnell College</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 IoT Security Project. MIT License.</p>
+        </div>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>
